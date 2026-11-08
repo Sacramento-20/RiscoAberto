@@ -1,0 +1,1080 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Mapa dos Bairros de Belo Horizonte</title>
+
+    <!-- Leaflet -->
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+        }
+
+        header {
+            background: #1e3a5f;
+            color: white;
+            padding: 20px;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 22px;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        /* Área do mapa */
+        .map-area {
+            min-width: 0;
+        }
+
+        /* Pesquisa */
+        .search-container {
+            position: relative;
+            margin-bottom: 15px;
+            z-index: 1000;
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 0 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+
+        .search-box:focus-within {
+            border-color: #1e3a5f;
+            box-shadow: 0 0 0 2px rgba(30,58,95,0.12);
+        }
+
+        .search-box input {
+            flex: 1;
+            border: none;
+            outline: none;
+            padding: 15px 10px;
+            font-size: 15px;
+            min-width: 0;
+        }
+
+        .search-icon {
+            color: #777;
+            font-size: 18px;
+        }
+
+        #clear-search {
+            display: none;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 20px;
+            color: #777;
+        }
+
+        /* Sugestões */
+        #suggestions {
+            display: none;
+            position: absolute;
+            top: calc(100% + 5px);
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-height: 280px;
+            overflow-y: auto;
+            z-index: 2000;
+        }
+
+        .suggestion-item {
+            display: block;
+            width: 100%;
+            text-align: left;
+            border: none;
+            border-bottom: 1px solid #eee;
+            padding: 13px 15px;
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .suggestion-item:hover,
+        .suggestion-item.active {
+            background: #edf3f9;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .no-results {
+            padding: 15px;
+            color: #777;
+            font-size: 14px;
+        }
+
+        /* Mapa */
+        #map {
+            height: 650px;
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+            z-index: 1;
+        }
+
+        /* Painel */
+        .info-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            height: fit-content;
+            margin-top: 20px;
+        }
+
+        .info-panel h2 {
+            margin-top: 0;
+            color: #1e3a5f;
+            font-size: 20px;
+        }
+
+        .info-item {
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .info-label {
+            display: block;
+            color: #777;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .description {
+            color: #777;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 800px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            #map {
+                height: 500px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>Mapa dos Bairros de Belo Horizonte</h1>
+    </header>
+
+    <main class="container">
+
+        <section class="map-area">
+
+            <!-- Barra de pesquisa -->
+            <div class="search-container">
+
+                <div class="search-box">
+
+                    <span class="search-icon">⌕</span>
+
+                    <input
+                        type="text"
+                        id="search-bairro"
+                        placeholder="Digite o nome de um bairro..."
+                        autocomplete="off"
+                        aria-label="Pesquisar bairro"
+                    >
+
+                    <button
+                        type="button"
+                        id="clear-search"
+                        aria-label="Limpar pesquisa"
+                    >
+                        &times;
+                    </button>
+
+                </div>
+
+                <!-- Lista de sugestões -->
+                <div id="suggestions"></div>
+
+            </div>
+
+            <!-- Mapa -->
+            <div id="map"></div>
+
+        </section>
+
+
+        <!-- Painel de informações -->
+        <aside class="info-panel">
+
+            <h2 id="bairro-nome">
+                Informações do bairro
+            </h2>
+
+            <p class="description" id="bairro-descricao">
+                Pesquise e selecione um bairro para visualizar
+                seu contorno e suas informações.
+            </p>
+
+            <div class="info-item">
+                <span class="info-label">
+                    Resposta do backend
+                </span>
+
+                <span
+                    class="info-value"
+                    id="bairro-backend-mensagem"
+                >
+                    Selecione um bairro para consultar o backend.
+                </span>
+            </div>
+
+            <div class="info-item">
+                <span class="info-label">ID</span>
+                <span class="info-value" id="bairro-id">-</span>
+            </div>
+
+            <div class="info-item">
+                <span class="info-label">ID BAC</span>
+                <span class="info-value" id="bairro-bac">-</span>
+            </div>
+
+            <div class="info-item">
+                <span class="info-label">Código</span>
+                <span class="info-value" id="bairro-codigo">-</span>
+            </div>
+
+            <div class="info-item">
+                <span class="info-label">Área (km²)</span>
+                <span class="info-value" id="bairro-area">-</span>
+            </div>
+
+            <div class="info-item">
+                <span class="info-label">Perímetro (m)</span>
+                <span class="info-value" id="bairro-perimetro">-</span>
+            </div>
+
+            <div class="info-item">
+                <span class="info-label">Geometria</span>
+                <span class="info-value" id="bairro-geometria">-</span>
+            </div>
+
+        </aside>
+
+    </main>
+
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+
+        // ==========================================
+        // 1. INICIALIZAÇÃO DO MAPA
+        // ==========================================
+
+        const map = L.map("map").setView(
+            [-19.9167, -43.9345],
+            12
+        );
+
+        L.tileLayer(
+            "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            {
+                maxZoom: 19,
+                attribution: "&copy; OpenStreetMap contributors"
+            }
+        ).addTo(map);
+
+        // ==========================================
+        // CAMADAS GEOGRÁFICAS
+        // ==========================================
+
+        // Camada dos bairros selecionados
+        map.createPane("bairrosPane");
+        map.getPane("bairrosPane").style.zIndex = 420;
+
+        // Camada das áreas de inundação
+        map.createPane("inundacaoPane");
+        
+        // ==========================================
+        // CAMADA DE TODOS OS BAIRROS
+        // ==========================================
+
+        const camadaTodosBairros = L.geoJSON(null, {
+
+            pane: "bairrosPane",
+
+            style: function() {
+                return {
+                    fillColor: "#2b8cbe",
+                    color: "#045a8d",
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.15
+                };
+            },
+
+            onEachFeature: function(feature, layer) {
+
+                layer.bindTooltip(
+                    feature.properties.NOME || "Bairro"
+                );
+
+            }
+
+        });
+
+        // Camada independente para destacar o bairro pesquisado
+        const camadaSelecionada = L.geoJSON(null, {
+
+            pane: "bairrosPane",
+
+            style: function() {
+                return {
+                    fillColor: "#2b8cbe",
+                    color: "#045a8d",
+                    weight: 2.5,
+                    opacity: 1,
+                    fillOpacity: 0.4
+                };
+            }
+
+        });
+
+
+        map.getPane("inundacaoPane").style.zIndex = 450;
+
+        // Grupo das áreas de inundação
+        const camadaInundacao = L.geoJSON(null, {
+
+            pane: "inundacaoPane",
+
+            style: function(feature) {
+                return {
+                    fillColor: "#dc2626",
+                    color: "#991b1b",
+                    weight: 1.5,
+                    opacity: 1,
+                    fillOpacity: 0.45
+                };
+            },
+
+            onEachFeature: function(feature, layer) {
+
+                const props = feature.properties;
+
+                // Cria popup sem interpretar os dados como HTML
+                const popup = document.createElement("div");
+
+                const titulo = document.createElement("strong");
+                titulo.textContent = "Área de risco de inundação";
+
+                const identificador = document.createElement("p");
+                identificador.textContent =
+                    `ID da área: ${props.ID_ARG ?? "-"}`;
+
+                const risco = document.createElement("p");
+                risco.textContent =
+                    `Classificação: ${props.RISCO_GEOLOGICO ?? "-"}`;
+
+                const fid = document.createElement("p");
+                fid.textContent = `FID: ${props.FID ?? "-"}`;
+
+                popup.append(titulo, identificador, risco, fid);
+
+                layer.bindPopup(popup);
+
+                layer.bindTooltip(
+                    props.RISCO_GEOLOGICO || "Risco de inundação"
+                );
+
+                // Destaque ao passar o mouse
+                layer.on("mouseover", function() {
+                    layer.setStyle({
+                        fillColor: "#991b1b",
+                        color: "#7f1d1d",
+                        weight: 2.5,
+                        fillOpacity: 0.65
+                    });
+                });
+
+                layer.on("mouseout", function() {
+                    camadaInundacao.resetStyle(layer);
+                });
+
+            }
+
+        });
+        let bairros = [];
+        let bairroSelecionado = null;
+        let indiceAtivo = -1;
+        let requisicaoBairroId = 0;
+        // ==========================================
+        // CONTROLE DE CAMADAS
+        // ==========================================
+
+        const controleCamadas = L.control.layers(
+            null,
+            {
+                "Todos os contornos dos bairros": camadaTodosBairros,
+
+                "Áreas de risco de inundação": camadaInundacao
+                // Futuras camadas:
+            },
+            {
+                position: "topright",
+                collapsed: false
+            }
+        ).addTo(map);
+
+        // ==========================================
+        // GERENCIAMENTO DOS CONTORNOS DOS BAIRROS
+        // ==========================================
+
+        // Verifica se a camada geral está ativada
+        function bairrosVisiveis() {
+
+            return map.hasLayer(camadaTodosBairros);
+
+        }
+
+
+        // Quando o usuário ativa a camada geral
+        map.on("overlayadd", function(event) {
+
+            if (event.layer !== camadaTodosBairros) {
+                return;
+            }
+
+            camadaTodosBairros.clearLayers();
+
+            if (bairroSelecionado) {
+
+                // Se existe bairro selecionado,
+                // mostra somente ele na camada geral
+                camadaTodosBairros.addData(bairroSelecionado);
+
+                // Remove o destaque independente
+                map.removeLayer(camadaSelecionada);
+
+            } else {
+
+                // Sem pesquisa: mostra todos os bairros
+                camadaTodosBairros.addData({
+                    type: "FeatureCollection",
+                    features: bairros
+                });
+
+            }
+
+        });
+
+
+        // Quando o usuário desativa a camada geral
+        map.on("overlayremove", function(event) {
+
+            if (event.layer !== camadaTodosBairros) {
+                return;
+            }
+
+            // Se existe um bairro selecionado,
+            // mantém seu contorno visível
+            if (bairroSelecionado) {
+
+                camadaSelecionada.clearLayers();
+
+                camadaSelecionada.addData(bairroSelecionado);
+
+                camadaSelecionada.addTo(map);
+
+            }
+
+        });
+
+        // ==========================================
+        // CARREGAR ÁREAS DE INUNDAÇÃO
+        // ==========================================
+
+        fetch("/api/areas-inundacao/geojson")
+
+            .then(response => {
+
+                if (!response.ok) {
+                    throw new Error(
+                        "Erro ao carregar áreas de inundação."
+                    );
+                }
+
+                return response.json();
+
+            })
+
+            .then(data => {
+
+                // Adiciona os polígonos ao grupo.
+                // Não adiciona o grupo diretamente ao mapa.
+                camadaInundacao.addData(data);
+
+                console.log(
+                    "Áreas de inundação carregadas:",
+                    data.features.length
+                );
+
+            })
+
+            .catch(error => {
+
+                console.error(error);
+
+            });
+
+        // ==========================================
+        // 2. ELEMENTOS DA PESQUISA
+        // ==========================================
+
+        const searchInput = document.getElementById("search-bairro");
+        const suggestions = document.getElementById("suggestions");
+        const clearButton = document.getElementById("clear-search");
+
+
+        // ==========================================
+        // 3. NORMALIZAÇÃO DO TEXTO
+        // ==========================================
+
+        // Ignora acentos e diferenças entre maiúsculas
+        // e minúsculas na pesquisa.
+
+        function normalizarTexto(texto) {
+
+            return String(texto || "")
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase()
+                .trim();
+
+        }
+
+
+        // ==========================================
+        // 4. ESTILOS DOS POLÍGONOS
+        // ==========================================
+
+        function estiloBairro() {
+
+            return {
+                fillColor: "#2b8cbe",
+                color: "#045a8d",
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.4
+            };
+
+        }
+
+
+        // ==========================================
+        // 5. PAINEL DE INFORMAÇÕES
+        // ==========================================
+
+        function mostrarInformacoes(feature) {
+
+            const props = feature.properties;
+
+            function formatar(valor) {
+
+                if (valor === null || valor === undefined || valor === "") {
+                    return "-";
+                }
+
+                const numero = Number(valor);
+
+                return Number.isFinite(numero)
+                    ? numero.toLocaleString("pt-BR", {
+                        maximumFractionDigits: 3
+                    })
+                    : valor;
+
+            }
+
+            document.getElementById("bairro-nome").textContent =
+                props.NOME || "Bairro";
+
+            document.getElementById("bairro-descricao").textContent =
+                "Informações geográficas do bairro selecionado.";
+
+            document.getElementById("bairro-id").textContent =
+                props._id ?? "-";
+
+            document.getElementById("bairro-bac").textContent =
+                props.ID_BAC ?? "-";
+
+            document.getElementById("bairro-codigo").textContent =
+                props.CODIGO ?? "-";
+
+            document.getElementById("bairro-area").textContent =
+                formatar(props.AREA_KM2);
+
+            document.getElementById("bairro-perimetro").textContent =
+                formatar(props.PERIMETR_M);
+
+            document.getElementById("bairro-geometria").textContent =
+                feature.geometry.type;
+
+        }
+
+
+        async function consultarBairroBackend(feature) {
+
+            const nomeBairro = feature.properties.NOME;
+
+            const mensagemElemento = document.getElementById(
+                "bairro-backend-mensagem"
+            );
+
+            // Identificador desta requisição
+            const requisicaoAtual = ++requisicaoBairroId;
+
+            mensagemElemento.textContent = "Consultando informações no servidor...";
+
+            try {
+
+                const response = await fetch("/api/bairros/selecionado", {
+
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        nome_bairro: nomeBairro
+                    })
+
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(
+                        data.mensagem || "Erro ao consultar o bairro."
+                    );
+                }
+
+                // Ignora respostas de seleções anteriores
+                if (requisicaoAtual !== requisicaoBairroId) {
+                    return;
+                }
+
+                mensagemElemento.textContent = data.mensagem;
+
+                console.log("Resposta do backend:", data);
+
+            } catch (error) {
+
+                // Não permite que erros de requisições antigas
+                // alterem a interface atual
+                if (requisicaoAtual !== requisicaoBairroId) {
+                    return;
+                }
+
+                console.error("Erro na consulta do bairro:", error);
+
+                mensagemElemento.textContent =
+                    "Não foi possível consultar as informações do bairro.";
+
+            }
+
+        }
+
+
+        // ==========================================
+        // 6. SELECIONAR UM BAIRRO
+        // ==========================================
+
+        function selecionarBairro(feature) {
+
+            // Guarda o bairro selecionado
+            bairroSelecionado = feature;
+
+            // Limpa o destaque anterior
+            camadaSelecionada.clearLayers();
+
+            // Limpa a camada geral
+            camadaTodosBairros.clearLayers();
+
+            if (bairrosVisiveis()) {
+
+                // Se a camada geral estiver ativada,
+                // mostra somente o bairro pesquisado
+                camadaTodosBairros.addData(feature);
+
+                map.removeLayer(camadaSelecionada);
+
+            } else {
+
+                // Se estiver desativada,
+                // mostra somente o bairro selecionado
+                camadaSelecionada.addData(feature);
+
+                camadaSelecionada.addTo(map);
+
+            }
+
+            // Calcula os limites geográficos do bairro
+            const limites = L.geoJSON(feature).getBounds();
+
+            // Aproxima o mapa
+            map.fitBounds(limites, {
+                padding: [40, 40],
+                maxZoom: 16
+            });
+
+            // Atualiza informações
+            mostrarInformacoes(feature);
+
+            // Consulta informações adicionais no backend
+            consultarBairroBackend(feature);
+
+            // Atualiza pesquisa
+            searchInput.value = feature.properties.NOME;
+
+            // Fecha sugestões
+            suggestions.style.display = "none";
+
+            clearButton.style.display = "block";
+
+        }
+
+
+        // ==========================================
+        // 7. CRIAR LISTA DE SUGESTÕES
+        // ==========================================
+
+        function mostrarSugestoes(lista) {
+
+            suggestions.innerHTML = "";
+            indiceAtivo = -1;
+
+            if (lista.length === 0) {
+
+                const mensagem = document.createElement("div");
+
+                mensagem.className = "no-results";
+                mensagem.textContent = "Nenhum bairro encontrado.";
+
+                suggestions.appendChild(mensagem);
+
+                suggestions.style.display = "block";
+
+                return;
+            }
+
+            // Limita a quantidade de sugestões visíveis
+            lista.slice(0, 10).forEach((feature) => {
+
+                const botao = document.createElement("button");
+
+                botao.type = "button";
+                botao.className = "suggestion-item";
+
+                // textContent evita interpretar nomes como HTML
+                botao.textContent = feature.properties.NOME;
+
+                botao.addEventListener("click", () => {
+                    selecionarBairro(feature);
+                });
+
+                suggestions.appendChild(botao);
+
+            });
+
+            suggestions.style.display = "block";
+
+        }
+
+
+        // ==========================================
+        // 8. PESQUISA DE BAIRROS
+        // ==========================================
+
+        searchInput.addEventListener("input", function() {
+
+            const texto = normalizarTexto(this.value);
+
+            clearButton.style.display =
+                this.value ? "block" : "none";
+
+            // Não mostra sugestões quando o campo está vazio
+            if (texto.length === 0) {
+
+                suggestions.style.display = "none";
+
+                return;
+            }
+
+            // Pesquisa somente nos nomes existentes no CSV
+            const resultados = bairros.filter(feature => {
+
+                const nome = normalizarTexto(
+                    feature.properties.NOME
+                );
+
+                // Busca por início do nome ou parte dele
+                return nome.includes(texto);
+
+            });
+
+            mostrarSugestoes(resultados);
+
+        });
+
+
+        // ==========================================
+        // 9. NAVEGAÇÃO PELO TECLADO
+        // ==========================================
+
+        searchInput.addEventListener("keydown", function(event) {
+
+            const botoes = suggestions.querySelectorAll(
+                ".suggestion-item"
+            );
+
+            if (event.key === "ArrowDown" && botoes.length) {
+
+                event.preventDefault();
+
+                indiceAtivo = Math.min(
+                    indiceAtivo + 1,
+                    botoes.length - 1
+                );
+
+                atualizarSugestaoAtiva(botoes);
+
+            }
+
+            else if (event.key === "ArrowUp" && botoes.length) {
+
+                event.preventDefault();
+
+                indiceAtivo = Math.max(
+                    indiceAtivo - 1,
+                    0
+                );
+
+                atualizarSugestaoAtiva(botoes);
+
+            }
+
+            else if (event.key === "Enter") {
+
+                event.preventDefault();
+
+                if (indiceAtivo >= 0 && botoes[indiceAtivo]) {
+
+                    botoes[indiceAtivo].click();
+
+                } else if (botoes.length === 1) {
+
+                    botoes[0].click();
+
+                }
+
+            }
+
+            else if (event.key === "Escape") {
+
+                suggestions.style.display = "none";
+
+            }
+
+        });
+
+
+        function atualizarSugestaoAtiva(botoes) {
+
+            botoes.forEach((botao, index) => {
+
+                botao.classList.toggle(
+                    "active",
+                    index === indiceAtivo
+                );
+
+            });
+
+        }
+
+
+        // ==========================================
+        // 10. LIMPAR PESQUISA
+        // ==========================================
+
+        clearButton.addEventListener("click", function() {
+
+            searchInput.value = "";
+
+            suggestions.style.display = "none";
+
+            clearButton.style.display = "none";
+
+            // Remove o bairro selecionado
+            map.removeLayer(camadaSelecionada);
+
+            camadaSelecionada.clearLayers();
+
+            bairroSelecionado = null;
+
+            // Invalida requisições anteriores
+            requisicaoBairroId++;
+
+            // Se o toggle geral estiver ligado,
+            // restaura todos os bairros
+            if (bairrosVisiveis()) {
+
+                camadaTodosBairros.clearLayers();
+
+                camadaTodosBairros.addData({
+                    type: "FeatureCollection",
+                    features: bairros
+                });
+
+            } else {
+
+                // Caso contrário, mantém todos ocultos
+                camadaTodosBairros.clearLayers();
+
+            }
+
+            // Volta para a visão geral de BH
+            map.setView([-19.9167, -43.9345], 12);
+
+            // Limpa o painel
+            document.getElementById("bairro-nome").textContent =
+                "Informações do bairro";
+
+            document.getElementById("bairro-descricao").textContent =
+                "Pesquise e selecione um bairro para visualizar seu contorno.";
+
+            [
+                "bairro-id",
+                "bairro-bac",
+                "bairro-codigo",
+                "bairro-area",
+                "bairro-perimetro",
+                "bairro-geometria"
+            ].forEach(id => {
+
+                document.getElementById(id).textContent = "-";
+
+            });
+
+            document.getElementById("bairro-backend-mensagem").textContent =
+                "Selecione um bairro para consultar o backend.";
+
+            searchInput.focus();
+
+        });
+
+
+        // Fecha as sugestões ao clicar fora da pesquisa
+        document.addEventListener("click", function(event) {
+
+            if (!event.target.closest(".search-container")) {
+
+                suggestions.style.display = "none";
+
+            }
+
+        });
+
+
+        // ==========================================
+        // 11. CARREGAR OS BAIRROS DO FLASK
+        // ==========================================
+
+        fetch("/api/bairros/geojson")
+
+            .then(response => {
+
+                if (!response.ok) {
+                    throw new Error("Erro ao carregar os bairros.");
+                }
+
+                return response.json();
+
+            })
+
+            .then(data => {
+
+                bairros = data.features || [];
+
+                console.log(
+                    "Total de bairros disponíveis:",
+                    bairros.length
+                );
+
+                // Se o usuário já ativou a camada geral,
+                // carrega todos os bairros
+                if (bairrosVisiveis() && !bairroSelecionado) {
+
+                    camadaTodosBairros.clearLayers();
+
+                    camadaTodosBairros.addData({
+                        type: "FeatureCollection",
+                        features: bairros
+                    });
+
+                }
+
+            })
+
+            .catch(error => {
+
+                console.error(error);
+
+                document.getElementById("bairro-descricao").textContent =
+                    "Não foi possível carregar os bairros. Tente novamente.";
+
+            });
+
+    </script>
+
+</body>
+</html>
