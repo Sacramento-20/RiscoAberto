@@ -119,6 +119,79 @@ def get_areas_inundacao_geojson():
 
     return geojson
 
+def _normalizar_nome(texto: str) -> str:
+    """Ignora acentos, maiúsculas e espaços extras (igual ao frontend)."""
+
+    import unicodedata
+
+    texto = unicodedata.normalize("NFD", str(texto or ""))
+    texto = "".join(c for c in texto if unicodedata.category(c) != "Mn")
+
+    return " ".join(texto.lower().split())
+
+
+@lru_cache(maxsize=1)
+def _pontos_bairros():
+    """
+    Ponto representativo de cada região do CSV de bairros.
+
+    Retorna dois dicionários de (nome, latitude, longitude):
+      - por_id:   chave = coluna _id (única)
+      - por_nome: chave = nome normalizado
+
+    O CSV tem nomes repetidos (ex.: "Califórnia" é Bairro e também
+    Vila). Na busca por nome, prevalece o registro do TIPO "Bairro".
+
+    O ponto é calculado no CRS projetado (EPSG:31983) e fica sempre
+    dentro do polígono, ao contrário do centroide em formas irregulares.
+    """
+
+    df = pd.read_csv(CSV_PATH_BAIRROS)
+    df.columns = df.columns.str.strip()
+
+    gdf = gpd.GeoDataFrame(
+        df[["_id", "TIPO", "NOME"]],
+        geometry=df["GEOMETRIA"].apply(wkt.loads),
+        crs="EPSG:31983"
+    )
+
+    pontos = gdf.geometry.representative_point().to_crs(epsg=4326)
+
+    por_id = {}
+    por_nome = {}
+
+    # Registros do tipo "Bairro" por último, para sobrescreverem
+    # homônimos de outros tipos no dicionário por nome.
+    ordem = sorted(
+        range(len(gdf)),
+        key=lambda i: gdf["TIPO"].iloc[i] == "Bairro"
+    )
+
+    for i in ordem:
+        nome = str(gdf["NOME"].iloc[i]).strip()
+        ponto = pontos.iloc[i]
+        registro = (nome, ponto.y, ponto.x)
+
+        por_id[str(gdf["_id"].iloc[i])] = registro
+        por_nome[_normalizar_nome(nome)] = registro
+
+    return por_id, por_nome
+
+
+def localizar_bairro(nome_bairro: str = None, id_bairro=None):
+    """
+    Retorna (nome, latitude, longitude) do bairro ou None.
+    Prefira id_bairro (coluna _id): nomes podem se repetir.
+    """
+
+    por_id, por_nome = _pontos_bairros()
+
+    if id_bairro is not None:
+        return por_id.get(str(id_bairro).strip())
+
+    return por_nome.get(_normalizar_nome(nome_bairro))
+
+
 def consultar_bairro(nome_bairro: str) -> str:
 
     bairro = nome_bairro.strip()

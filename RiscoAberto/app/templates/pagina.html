@@ -183,6 +183,25 @@
             line-height: 1.5;
         }
 
+        /* Clima */
+        .clima-grade {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 16px;
+            margin-top: 12px;
+        }
+
+        .clima-grade[hidden] {
+            display: none;
+        }
+
+        .clima-fonte {
+            display: block;
+            margin-top: 10px;
+            color: #999;
+            font-size: 11px;
+        }
+
         @media (max-width: 800px) {
             .container {
                 grid-template-columns: 1fr;
@@ -264,6 +283,43 @@
                 >
                     Selecione um bairro para consultar o backend.
                 </span>
+            </div>
+
+            <div class="info-item clima-bloco">
+                <span class="info-label">Clima agora no bairro</span>
+
+                <span class="info-value" id="clima-resumo">
+                    Selecione um bairro para ver o clima.
+                </span>
+
+                <div class="clima-grade" id="clima-detalhes" hidden>
+                    <div>
+                        <span class="info-label">Temperatura</span>
+                        <span class="info-value" id="clima-temperatura">-</span>
+                    </div>
+                    <div>
+                        <span class="info-label">Sensação térmica</span>
+                        <span class="info-value" id="clima-sensacao">-</span>
+                    </div>
+                    <div>
+                        <span class="info-label">Umidade</span>
+                        <span class="info-value" id="clima-umidade">-</span>
+                    </div>
+                    <div>
+                        <span class="info-label">Vento</span>
+                        <span class="info-value" id="clima-vento">-</span>
+                    </div>
+                    <div>
+                        <span class="info-label">Chuva agora</span>
+                        <span class="info-value" id="clima-chuva-agora">-</span>
+                    </div>
+                    <div>
+                        <span class="info-label">Chuva nas últimas 24 h</span>
+                        <span class="info-value" id="clima-chuva-24h">-</span>
+                    </div>
+                </div>
+
+                <span class="clima-fonte" id="clima-fonte"></span>
             </div>
 
             <div class="info-item">
@@ -726,6 +782,113 @@
 
 
         // ==========================================
+        // 5b. CLIMA DO BAIRRO
+        // ==========================================
+
+        let requisicaoClimaId = 0;
+
+        function formatarNumero(valor, unidade, casas = 1) {
+
+            const numero = Number(valor);
+
+            if (valor === null || valor === undefined || !Number.isFinite(numero)) {
+                return "-";
+            }
+
+            return `${numero.toLocaleString("pt-BR", {
+                maximumFractionDigits: casas
+            })} ${unidade}`;
+
+        }
+
+        function limparClima(mensagem) {
+
+            document.getElementById("clima-resumo").textContent = mensagem;
+            document.getElementById("clima-detalhes").hidden = true;
+            document.getElementById("clima-fonte").textContent = "";
+
+        }
+
+        async function consultarClima(feature) {
+
+            const props = feature.properties;
+            const requisicaoAtual = ++requisicaoClimaId;
+
+            // O _id é único; o nome pode se repetir entre bairro e vila
+            const consulta = (props._id !== undefined && props._id !== null)
+                ? "id=" + encodeURIComponent(props._id)
+                : "bairro=" + encodeURIComponent(props.NOME);
+
+            limparClima("Consultando o clima...");
+
+            try {
+
+                const response = await fetch("/api/clima?" + consulta);
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(
+                        data.mensagem || "Erro ao consultar o clima."
+                    );
+                }
+
+                // Ignora respostas de seleções anteriores
+                if (requisicaoAtual !== requisicaoClimaId) {
+                    return;
+                }
+
+                const clima = data.clima;
+                const u = clima.unidades || {};
+
+                document.getElementById("clima-resumo").textContent =
+                    clima.descricao;
+
+                document.getElementById("clima-temperatura").textContent =
+                    formatarNumero(clima.temperatura_c, u.temperatura || "°C");
+
+                document.getElementById("clima-sensacao").textContent =
+                    formatarNumero(clima.sensacao_termica_c, u.temperatura || "°C");
+
+                document.getElementById("clima-umidade").textContent =
+                    formatarNumero(clima.umidade_relativa_pct, "%", 0);
+
+                document.getElementById("clima-vento").textContent =
+                    formatarNumero(clima.vento_kmh, u.vento || "km/h");
+
+                document.getElementById("clima-chuva-agora").textContent =
+                    formatarNumero(clima.precipitacao_mm, u.precipitacao || "mm");
+
+                document.getElementById("clima-chuva-24h").textContent =
+                    formatarNumero(clima.chuva_ultimas_24h_mm, u.precipitacao || "mm");
+
+                const hora = new Date(clima.atualizado_em)
+                    .toLocaleTimeString("pt-BR", {
+                        hour: "2-digit",
+                        minute: "2-digit"
+                    });
+
+                document.getElementById("clima-fonte").textContent =
+                    `Atualizado às ${hora} · ${clima.fonte}`;
+
+                document.getElementById("clima-detalhes").hidden = false;
+
+            } catch (error) {
+
+                if (requisicaoAtual !== requisicaoClimaId) {
+                    return;
+                }
+
+                console.error("Erro na consulta do clima:", error);
+
+                limparClima("Não foi possível obter o clima agora.");
+
+            }
+
+        }
+
+
+        // ==========================================
         // 6. SELECIONAR UM BAIRRO
         // ==========================================
 
@@ -772,6 +935,9 @@
 
             // Consulta informações adicionais no backend
             consultarBairroBackend(feature);
+
+            // Consulta o clima atual no bairro
+            consultarClima(feature);
 
             // Atualiza pesquisa
             searchInput.value = feature.properties.NOME;
@@ -963,6 +1129,9 @@
 
             // Invalida requisições anteriores
             requisicaoBairroId++;
+            requisicaoClimaId++;
+
+            limparClima("Selecione um bairro para ver o clima.");
 
             // Se o toggle geral estiver ligado,
             // restaura todos os bairros

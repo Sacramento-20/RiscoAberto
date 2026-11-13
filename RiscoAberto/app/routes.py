@@ -1,7 +1,83 @@
 from flask import jsonify, render_template, request
-from app.utils import get_bairros_geojson, get_areas_inundacao_geojson, consultar_bairro
+from app.utils import (
+    get_bairros_geojson,
+    get_areas_inundacao_geojson,
+    consultar_bairro,
+    localizar_bairro,
+)
+from app.clima import obter_clima, dentro_de_bh, ClimaIndisponivel
 
 def register_routes(app):
+
+    @app.route("/api/clima", methods=["GET"])
+    def api_clima():
+        """
+        Condições do tempo agora em uma região de BH.
+
+        Uso (um dos três):
+            /api/clima?id=217              (coluna _id do CSV; recomendado)
+            /api/clima?bairro=Califórnia   (nome; homônimos -> TIPO Bairro)
+            /api/clima?lat=-19.93&lon=-43.94
+        """
+
+        id_bairro = (request.args.get("id") or "").strip()
+        nome_bairro = (request.args.get("bairro") or "").strip()
+        lat_txt = request.args.get("lat")
+        lon_txt = request.args.get("lon")
+
+        bairro = None
+
+        if id_bairro or nome_bairro:
+
+            if id_bairro:
+                encontrado = localizar_bairro(id_bairro=id_bairro)
+            else:
+                encontrado = localizar_bairro(nome_bairro)
+
+            if encontrado is None:
+                return jsonify({
+                    "status": "erro",
+                    "mensagem": f"Bairro não encontrado: {id_bairro or nome_bairro}"
+                }), 404
+
+            bairro, latitude, longitude = encontrado
+
+        elif lat_txt is not None and lon_txt is not None:
+
+            try:
+                latitude = float(lat_txt)
+                longitude = float(lon_txt)
+            except ValueError:
+                return jsonify({
+                    "status": "erro",
+                    "mensagem": "lat e lon devem ser números."
+                }), 400
+
+            if not dentro_de_bh(latitude, longitude):
+                return jsonify({
+                    "status": "erro",
+                    "mensagem": "Coordenada fora de Belo Horizonte."
+                }), 400
+
+        else:
+            return jsonify({
+                "status": "erro",
+                "mensagem": "Informe ?id=<_id>, ?bairro=<nome> ou ?lat=<lat>&lon=<lon>."
+            }), 400
+
+        try:
+            clima = obter_clima(latitude, longitude)
+        except ClimaIndisponivel:
+            return jsonify({
+                "status": "erro",
+                "mensagem": "Serviço de clima indisponível no momento."
+            }), 503
+
+        return jsonify({
+            "status": "sucesso",
+            "bairro": bairro,
+            "clima": clima
+        }), 200
 
     @app.route("/")
     def page():
