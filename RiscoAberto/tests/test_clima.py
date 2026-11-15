@@ -154,6 +154,35 @@ class TesteClima(unittest.TestCase):
             r = self.client.get("/api/clima?bairro=Lindéia")
         self.assertEqual(r.status_code, 503)
 
+    def test_metadados_dublin_core_e_iso19115(self):
+        r = self.client.get("/api/metadados")
+        self.assertEqual(r.status_code, 200)
+        dados = r.get_json()
+        self.assertIn("dublin_core", dados)
+        self.assertIn("iso_19115_mgb", dados)
+        self.assertIn("gestao_arquivistica_earq", dados)
+
+    def test_areas_sbn_geojson(self):
+        r = self.client.get("/api/areas-sbn/alagamento/geojson")
+        self.assertEqual(r.status_code, 200)
+        dados = r.get_json()
+        self.assertEqual(dados["type"], "FeatureCollection")
+        self.assertGreater(len(dados["features"]), 0)
+
+        r_invalido = self.client.get("/api/areas-sbn/inexistente/geojson")
+        self.assertEqual(r_invalido.status_code, 400)
+
+    def test_diagnostico_bairro_selecionado(self):
+        r = self.client.post(
+            "/api/bairros/selecionado",
+            json={"nome_bairro": "Califórnia", "id_bairro": 217},
+        )
+        self.assertEqual(r.status_code, 200)
+        dados = r.get_json()
+        self.assertEqual(dados["status"], "sucesso")
+        self.assertIn("diagnostico", dados)
+        self.assertEqual(dados["diagnostico"]["id"], 217)
+
 
 if __name__ == "__main__":
     unittest.main()
