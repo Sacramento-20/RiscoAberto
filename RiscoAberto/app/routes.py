@@ -2,8 +2,12 @@ from flask import jsonify, render_template, request
 from app.utils import (
     get_bairros_geojson,
     get_areas_inundacao_geojson,
+    get_areas_sbn_geojson,
+    get_metadados_catalogo,
     consultar_bairro,
+    diagnosticar_bairro,
     localizar_bairro,
+    TIPOS_SBN,
 )
 from app.clima import obter_clima, dentro_de_bh, ClimaIndisponivel
 
@@ -97,6 +101,31 @@ def register_routes(app):
 
         return jsonify(geojson)
 
+    @app.route("/api/areas-sbn/<tipo>/geojson", methods=["GET"])
+    def api_areas_sbn_geojson(tipo):
+        """
+        Retorna as microáreas prioritárias para Soluções Baseadas na
+        Natureza (SBN) para o tipo de ameaça:
+        alagamento | deslizamento | inundacao | ondas_calor
+        """
+        tipo_norm = (tipo or "").strip().lower()
+        if tipo_norm not in TIPOS_SBN:
+            return jsonify({
+                "status": "erro",
+                "mensagem": f"Tipo SBN inválido: {tipo}. Use um de: {list(TIPOS_SBN.keys())}"
+            }), 400
+
+        geojson = get_areas_sbn_geojson(tipo_norm)
+        return jsonify(geojson)
+
+    @app.route("/api/metadados", methods=["GET"])
+    def api_metadados():
+        """
+        Retorna os metadados padronizados (Dublin Core + ISO 19115),
+        o vocabulário controlado/tesauro e o plano de classificação (e-ARQ).
+        """
+        return jsonify(get_metadados_catalogo()), 200
+
     @app.route("/api/bairros/selecionado", methods=["POST"])
     def api_bairro_selecionado():
 
@@ -104,44 +133,46 @@ def register_routes(app):
         dados = request.get_json(silent=True) or {}
 
         nome_bairro = dados.get("nome_bairro")
+        id_bairro = dados.get("id_bairro")
 
         # Validação da entrada
-        if not isinstance(nome_bairro, str) or not nome_bairro.strip():
+        if (not isinstance(nome_bairro, str) or not nome_bairro.strip()) and id_bairro is None:
 
             return jsonify({
                 "status": "erro",
-                "mensagem": "Nome do bairro não informado."
+                "mensagem": "Nome ou ID do bairro não informado."
             }), 400
 
-        # Chama a função responsável pelo processamento
-        nome_bairro = nome_bairro.strip()
-
-        mensagem = consultar_bairro(nome_bairro)
+        # Chama a função responsável pelo processamento e diagnóstico
+        nome_bairro = (nome_bairro or "").strip()
+        diag = diagnosticar_bairro(nome_bairro=nome_bairro, id_bairro=id_bairro)
 
         # Retorna a resposta para o frontend
         return jsonify({
             "status": "sucesso",
-            "nome_bairro": nome_bairro,
-            "mensagem": mensagem
+            "nome_bairro": diag["nome"],
+            "mensagem": diag["mensagem"],
+            "diagnostico": diag,
         }), 200
 
     @app.route("/api/bairros/selecionado", methods=["GET"])
     def api_bairro_selecionado_get():
 
         nome_bairro = request.args.get("nome_bairro")
+        id_bairro = request.args.get("id")
 
-        if not nome_bairro or not nome_bairro.strip():
+        if (not nome_bairro or not nome_bairro.strip()) and not id_bairro:
             return jsonify({
                 "status": "erro",
                 "mensagem": "Nome do bairro não informado."
             }), 400
 
-        nome_bairro = nome_bairro.strip()
-
-        mensagem = consultar_bairro(nome_bairro)
+        nome_bairro = (nome_bairro or "").strip()
+        diag = diagnosticar_bairro(nome_bairro=nome_bairro, id_bairro=id_bairro)
 
         return jsonify({
             "status": "sucesso",
-            "nome_bairro": nome_bairro,
-            "mensagem": mensagem
+            "nome_bairro": diag["nome"],
+            "mensagem": diag["mensagem"],
+            "diagnostico": diag,
         }), 200
