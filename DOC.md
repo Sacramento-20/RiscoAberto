@@ -4,7 +4,7 @@
 
 ### 2.1 Principais Conceitos e Termos Utilizados na Aplicação
 
-Com base na **Teoria Analítica do Conceito de Ingetraut Dahlberg (1978)**, cada conceito é uma unidade de conhecimento constituída pela tríade: **Referente** (objeto empírico ou fenômeno), **Características** (predicados relevantes que permitem classificar e distinguir o referente) e **Termo** (designação verbal ou código em uma linguagem de especialidade). A tabela a seguir formaliza os conceitos nucleares da plataforma **RiscoAberto**:
+A tabela a seguir formaliza os conceitos nucleares da plataforma **RiscoAberto**:
 
 | Termo Preferido (Descritor) | Definição Conceitual (Características Essenciais) | Referente no Sistema (`RiscoAberto`) | Termos Não-Preferidos / Siglas Relacionadas |
 | :--- | :--- | :--- | :--- |
@@ -23,16 +23,16 @@ Com base na **Teoria Analítica do Conceito de Ingetraut Dahlberg (1978)**, cada
 
 #### A. Requisitos Funcionais (RF)
 - **RF01 — Recuperação Geoespacial por Bairro e Controle de Homônimos:** Permitir a busca textual de unidades territoriais ignorando acentuação e caixa (alta/baixa), resolvendo homônimos entre *Bairro* e *Vila* através do identificador único (`_id`) e do qualificador tipológico (`TIPO`).
-- **RF02 — Visualização em Camadas Temáticas (WebGIS):** Renderizar sobre o mapa base (OpenStreetMap) camadas independentes e combináveis de limites de bairros, manchas de risco de inundação (Defesa Civil) e áreas prioritárias para Soluções Baseadas na Natureza (alagamento, deslizamento de terra, inundação e ondas de calor).
-- **RF03 — Monitoramento Meteorológico Contextualizado:** Consultar e exibir em tempo real (com cache de 10 minutos) variáveis meteorológicas (temperatura, sensação térmica, umidade relativa, velocidade do vento, precipitação atual e precipitação acumulada nas últimas 24 horas) para o ponto representativo interno (`representative_point`) do polígono do bairro selecionado.
+- **RF02 — Visualização em Camadas Temáticas:** Renderizar sobre o mapa base camadas independentes e combináveis de limites de bairros, manchas de risco de inundação e áreas prioritárias para Soluções Baseadas na Natureza (alagamento, deslizamento de terra, inundação e ondas de calor).
+- **RF03 — Monitoramento Meteorológico Contextualizado:** Consultar e exibir em tempo real variáveis meteorológicas (temperatura, sensação térmica, umidade relativa, velocidade do vento, precipitação atual e precipitação acumulada nas últimas 24 horas) para o ponto representativo interno (`representative_point`) do polígono do bairro selecionado.
 - **RF04 — Busca Avançada com Operadores Lógicos e Filtragem Facetada:** Permitir filtrar unidades territoriais combinando critérios temáticos (tipo de localidade e presença de risco de inundação) e operadores lógicos booleanos (`AND`/`E`, `OR`/`OU`, `NOT`/`NAO`).
 - **RF05 — Geração de Boletim Preventivo Cidadão:** Traduzir os indicadores técnicos do bairro selecionado — obtidos pelo cruzamento espacial entre o polígono do bairro, as manchas de risco de inundação e as microáreas de vulnerabilidade SBN — em um boletim informativo em linguagem acessível para orientação preventiva da população.
-- **RF06 — Disponibilização via API Aberta com Metadados Padronizados:** Expor endpoints RESTful (`/api/bairros/geojson`, `/api/areas-inundacao/geojson`, `/api/areas-sbn/<tipo>/geojson`, `/api/clima` e `/api/metadados`) em formato JSON/GeoJSON acompanhados de descritores **Dublin Core** e **ISO 19115**.
+- **RF06 — Disponibilização via API Aberta com Metadados Padronizados:** Expor endpoints RESTful (`/api/bairros/geojson`, `/api/areas-inundacao/geojson`, `/api/areas-sbn/<tipo>/geojson`, `/api/clima` e `/api/metadados`) em formato JSON/GeoJSON acompanhados de descritores **Dublin Core** e **ISO 19115** (Perfil de metadados Geoespaciais).
 
 #### B. Requisitos Não-Funcionais (RNF)
 - **RNF01 — Interoperabilidade Geoespacial (OGC / IETF):** Todas as geometrias expostas na API e consumidas pelo frontend devem ser convertidas do sistema projetado oficial brasileiro (`SIRGAS 2000 / UTM zone 23S - EPSG:31983`) para o padrão internacional web (`WGS84 - EPSG:4326`) segundo a especificação **RFC 7946 (GeoJSON)**.
 - **RNF02 — Desempenho e Cache em Memória:** O processamento de arquivos CSV/WKT volumosos deve utilizar cache em memória (`@lru_cache`) e o serviço meteorológico deve manter tempo de vida (TTL) de 600 segundos por coordenada, evitando sobrecarga de serviços externos e garantindo tempo de resposta inferior a 500 ms em consultas subsequentes.
-- **RNF03 — Segurança contra Injeção de Código (XSS):** Os popups, listas de sugestões e painéis informativos devem renderizar atributos oriundos de bases externas utilizando manipulação segura de DOM (`textContent`), impedindo a execução de HTML ou scripts arbitrários.
+- **RNF03 — Segurança contra Injeção de Código (XSS):** Os popups, listas de sugestões e painéis informativos devem renderizar atributos vindos de bases externas utilizando manipulação segura de DOM (`textContent`), impedindo a execução de HTML ou scripts arbitrários.
 - **RNF04 — Usabilidade e Linguagem Simples (Plain Language):** A interface deve apresentar tradução imediata de códigos técnicos (como códigos WMO 0–99 e índices numéricos `SBN_*`) para descritores em língua portuguesa compreensíveis por usuários não especialistas.
 
 ---
@@ -41,7 +41,7 @@ Com base na **Teoria Analítica do Conceito de Ingetraut Dahlberg (1978)**, cada
 
 Com base no **e-ARQ Brasil (CONARQ, 2020)** — Modelo de Requisitos para Sistemas Informatizados de Gestão Arquivística de Documentos (SIGAD) —, o sistema observa os seguintes requisitos para assegurar que os registros de risco, malhas territoriais e séries climáticas mantenham autenticidade, integridade e valor informativo:
 
-1. **Captura e Registro Padronizado (e-ARQ Seção 1):** Ingestão estruturada dos conjuntos de dados oriundos do portal CKAN da Prefeitura de Belo Horizonte (DataBH/BHMap), preservando os identificadores únicos de origem (`FID`, `_id`, `ID_ARG`, `ID_AREAS_PRIORITARIAS_SBN_2022`) e os registros cronológicos (`atualizado_em` em padrão ISO 8601).
+1. **Captura e Registro Padronizado (e-ARQ Seção 1):** Ingestão estruturada dos conjuntos de dados vindos do portal CKAN da Prefeitura de Belo Horizonte (DataBH/BHMap), preservando os identificadores únicos de origem (`FID`, `_id`, `ID_ARG`, `ID_AREAS_PRIORITARIAS_SBN_2022`) e os registros cronológicos (`atualizado_em` em padrão ISO 8601).
 2. **Organicidade e Proveniência (Respeito aos Fundos):** Preservação explícita do vínculo arquivístico com a entidade produtora (Prefeitura de Belo Horizonte / PRODABEL / Subsecretaria de Proteção e Defesa Civil / SMMA / SUPLAN e Open-Meteo/INMET), distinguindo claramente dados cartográficos oficiais de estimativas de modelos meteorológicos por meio dos metadados `fonte` e `fonte_url`.
 3. **Autenticidade, Integridade e Imutabilidade dos Dados Primários:** Os arquivos brutos em `data/` são mantidos como depósitos somente-leitura (*read-only*) no pipeline; todas as transformações (limpeza, reprojeção cartográfica e normalização lexical) ocorrem em memória para geração das visões derivadas, preservando a cadeia de custódia do documento arquivístico digital original.
 4. **Rastreabilidade e Auditoria de Linhagem:** Documentação formal do fluxo de transformação cartográfica e indexação espacial (metadado de linhagem `gmd:LI_Lineage`), permitindo auditar a origem exata de cada diagnóstico territorial emitido pela plataforma.
@@ -68,7 +68,7 @@ A tabela a seguir detalha as fontes de dados abertos utilizadas pelo **RiscoAber
 As técnicas de tratamento temático implementadas na solução fundamentam-se na literatura clássica da Ciência da Informação:
 
 #### A. Teoria da Classificação — Classificação Facetada (Ranganathan, 1967) e Taxonomia de Riscos
-Conforme a **Teoria da Classificação Facetada de S. R. Ranganathan**, fenômenos multidimensionais — como os riscos socioambientais urbanos — não devem ser restritos a esquemas mono-hierárquicos rígidos, visto que um mesmo recorte territorial pode apresentar simultaneamente vulnerabilidade hidrológica, geológica e térmica. O domínio do **RiscoAberto** foi estruturado segundo as cinco categorias fundamentais **PMEST** (Personalidade, Matéria, Energia, Espaço e Tempo):
+O domínio do **RiscoAberto** foi estruturado segundo as cinco categorias fundamentais **PMEST** (Personalidade, Matéria, Energia, Espaço e Tempo):
 
 - **[P] Personalidade (Unidade Territorial):** Município de Belo Horizonte $\rightarrow$ Bacia Elementar (`ID_BAC`) $\rightarrow$ Tipologia de Localidade (`TIPO`: Bairro, Vila, Conjunto Habitacional) $\rightarrow$ Unidade Territorial (`NOME` / `_id`).
 - **[M] Matéria (Componentes e Índices Territoriais):** Condição Ambiental (`CON_AMB`), Condição Antrópica (`CON_ANT`), Índice de Exposição (`EXP_*`), Índice de Vulnerabilidade (`VUL_*`) e Dimensões Físicas (`AREA_KM2`, `PERIMETR_M`).
@@ -80,7 +80,7 @@ Conforme a **Teoria da Classificação Facetada de S. R. Ranganathan**, fenômen
 - **[T] Tempo (Recorte Temporal):** Condição meteorológica instantânea (`atualizado_em`), janela móvel acumulada de 24 horas (`chuva_ultimas_24h_mm`) e ano-base do mapeamento de vulnerabilidade (`2022`).
 
 #### B. Controle de Vocabulário — Tesauro Funcional e Controle de Homógrafos (Lancaster, 2004; ANSI/NISO Z39.19)
-De acordo com **Lancaster (2004)** e a norma **ANSI/NISO Z39.19**, o controle de vocabulário visa eliminar a ambiguidade (homonímia/polissemia) e controlar a dispersão sinonímica na recuperação da informação. Três instrumentos foram implementados no sistema:
+Três instrumentos foram implementados no sistema:
 
 1. **Controle de Homógrafos Geográficos com Qualificadores Parentéticos:** A base oficial de abairramento de Belo Horizonte contém **20 designações homônimas** entre categorias distintas (ex.: `Califórnia` existe como *Bairro* no `_id: 217` e como *Vila* no `_id: 138`; o mesmo ocorre com `Marçola`, `São José`, `do Barreiro`, entre outros). Seguindo as diretrizes da ANSI/NISO Z39.19 para desambiguação de homógrafos, o sistema gera o descritor qualificado `ROTULO_CONTROLADO` (ex.: `Califórnia (Bairro)` vs. `Califórnia (Vila)`), associa cada entidade ao seu identificador canônico (`_id`) e define regra de precedência para o tipo oficial `"Bairro"` em buscas não qualificadas.
 2. **Estrutura Relacional do Tesauro Simplificado (TG, TE, TR, UP/USE):**
@@ -95,7 +95,7 @@ De acordo com **Lancaster (2004)** e a norma **ANSI/NISO Z39.19**, o controle de
 3. **Tabela de Equivalência Terminológica Meteorológica (WMO Code 4677):** O dicionário `DESCRICOES_WMO` (`app/clima.py`) atua como tabela de tradução controlada que converte 28 códigos numéricos internacionais da Organização Meteorológica Mundial para descritores padronizados em língua portuguesa (ex.: código `80` $\rightarrow$ `"Pancadas de chuva fracas"`).
 
 #### C. Indexação — Indexação Automática por Extração Lexical e Atribuição Espacial (Lancaster, 2004)
-Segundo **Lancaster (2004)**, o processo de indexação compreende a análise conceitual e a tradução para termos de indexação. No **RiscoAberto**, aplica-se a **indexação automática híbrida**:
+No **RiscoAberto**, aplica-se a **indexação automática híbrida**:
 1. **Indexação Automática por Extração Normalizada:** A função `_normalizar_nome()` executa decomposição canônica Unicode (`NFD`), remoção de marcas diacríticas (acentos e cedilha), conversão para minúsculas (*case-folding*) e padronização de espaços, estruturando os dicionários de índice em memória (`por_id` e `por_nome`).
 2. **Indexação Automática por Atribuição Geoespacial (*Spatial Indexing*):** Por meio do predicado topológico `intersects` (biblioteca `GeoPandas`/`Shapely`), o sistema analisa geometricamente cada polígono de bairro contra os polígonos de inundação e as microáreas SBN, atribuindo automaticamente ao bairro a quantidade de manchas de risco (`AREAS_INUNDACAO`) e os descritores de criticidade (`Baixo`, `Médio`, `Alto`, `Muito Alto`).
 
