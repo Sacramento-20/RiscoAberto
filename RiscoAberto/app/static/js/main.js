@@ -428,23 +428,11 @@ function mostrarInformacoes(feature) {
     document.getElementById("bairro-descricao").textContent =
         `Unidade Territorial (${props.TIPO || "Bairro"}) · Manchas de Inundação: ${props.AREAS_INUNDACAO ?? 0}`;
 
-    document.getElementById("bairro-id").textContent =
-        props._id ?? "-";
-
-    document.getElementById("bairro-bac").textContent =
-        props.ID_BAC ?? "-";
-
-    document.getElementById("bairro-codigo").textContent =
-        props.CODIGO ?? "-";
-
     document.getElementById("bairro-area").textContent =
         formatar(props.AREA_KM2);
 
     document.getElementById("bairro-perimetro").textContent =
         formatar(props.PERIMETR_M);
-
-    document.getElementById("bairro-geometria").textContent =
-        feature.geometry.type;
 
 }
 
@@ -736,14 +724,11 @@ function destacarMultiplosBairros(lista, termoBusca) {
     limparClima(`Exibindo ${lista.length} bairros no mapa. Clique em um bairro específico para ver os dados climáticos.`);
 
     [
-        "bairro-id",
-        "bairro-bac",
-        "bairro-codigo",
         "bairro-area",
-        "bairro-perimetro",
-        "bairro-geometria"
+        "bairro-perimetro"
     ].forEach(id => {
-        document.getElementById(id).textContent = "-";
+        const el = document.getElementById(id);
+        if (el) el.textContent = "-";
     });
 
     suggestions.style.display = "none";
@@ -1157,15 +1142,12 @@ clearButton.addEventListener("click", function() {
         "Pesquise e selecione um bairro para visualizar seu contorno.";
 
     [
-        "bairro-id",
-        "bairro-bac",
-        "bairro-codigo",
         "bairro-area",
-        "bairro-perimetro",
-        "bairro-geometria"
+        "bairro-perimetro"
     ].forEach(id => {
 
-        document.getElementById(id).textContent = "-";
+        const el = document.getElementById(id);
+        if (el) el.textContent = "-";
 
     });
 
