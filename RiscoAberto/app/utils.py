@@ -406,37 +406,36 @@ def diagnosticar_bairro(nome_bairro: str = None, id_bairro=None) -> dict:
                 alertas.append(f"{cfg['rotulo']} ({nivel}: máx. {max_sbn:.2f})")
 
     # 3. Geração do boletim preventivo em linguagem cidadã acessível
-    partes = [f"[{tipo_local} {nome_oficial}]"]
     if manchas_inund > 0:
-        partes.append(
+        texto_inund = (
             f"Possui {manchas_inund} mancha(s) oficial(is) de risco de inundação mapeada(s) pela Defesa Civil."
         )
     else:
-        partes.append(
+        texto_inund = (
             "Não possui manchas diretas de inundação fluvial na base de áreas de risco geológico."
         )
 
+    linhas = [f"[{tipo_local} {nome_oficial}] {texto_inund}"]
+
     if alertas:
-        partes.append(
-            "Principais vulnerabilidades socioambientais (SBN): "
-            + ", ".join(alertas)
-            + "."
-        )
+        linhas.append("Principais vulnerabilidades socioambientais (SBN):")
+        for alerta in alertas:
+            linhas.append(f"• {alerta}")
     else:
-        partes.append(
+        linhas.append(
             "Apresenta criticidade baixa a moderada nas bases de vulnerabilidade climática (SBN)."
         )
 
     if manchas_inund > 0 or any("Alagamento" in a or "Inundação" in a for a in alertas):
-        partes.append(
+        linhas.append(
             "Recomendação preventiva: em caso de chuva acumulada superior a 20 mm em 24h, evite trafegar em fundos de vale e vias marginais. Emergência: Defesa Civil (199)."
         )
     elif any("Deslizamento" in a for a in alertas):
-        partes.append(
+        linhas.append(
             "Recomendação preventiva: observe sinais de trincas, inclinação de árvores/postes ou água barrenta em encostas durante períodos chuvosos. Emergência: Defesa Civil (199)."
         )
     else:
-        partes.append(
+        linhas.append(
             "Recomendação preventiva: acompanhe os boletins meteorológicos e contribua para a arborização e permeabilidade do solo no bairro."
         )
 
@@ -453,7 +452,7 @@ def diagnosticar_bairro(nome_bairro: str = None, id_bairro=None) -> dict:
         "manchas_inundacao": manchas_inund,
         "riscos_sbn": riscos_sbn,
         "nivel_geral": nivel_geral,
-        "mensagem": " ".join(partes),
+        "mensagem": "\n".join(linhas),
     }
 
 
