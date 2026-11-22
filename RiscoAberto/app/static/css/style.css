@@ -1,0 +1,278 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f4f6f9;
+}
+
+header {
+    background: #1e3a5f;
+    color: white;
+    padding: 20px;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 22px;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: 1.55fr 1fr;
+    gap: 20px;
+    padding: 20px;
+    align-items: start;
+}
+
+/* Área do mapa */
+.map-area {
+    min-width: 0;
+}
+
+/* Pesquisa */
+.search-container {
+    position: relative;
+    margin-bottom: 15px;
+    z-index: 1000;
+}
+
+.search-box {
+    display: flex;
+    align-items: center;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 0 12px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.search-box:focus-within {
+    border-color: #1e3a5f;
+    box-shadow: 0 0 0 2px rgba(30, 58, 95, 0.12);
+}
+
+.search-box input {
+    flex: 1;
+    border: none;
+    outline: none;
+    padding: 15px 10px;
+    font-size: 15px;
+    min-width: 0;
+}
+
+.search-icon {
+    color: #777;
+    font-size: 18px;
+}
+
+#clear-search {
+    display: none;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 20px;
+    color: #777;
+}
+
+/* Sugestões */
+#suggestions {
+    display: none;
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    right: 0;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-height: 280px;
+    overflow-y: auto;
+    z-index: 2000;
+}
+
+.suggestion-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-bottom: 1px solid #eee;
+    padding: 13px 15px;
+    background: white;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.suggestion-item:hover,
+.suggestion-item.active {
+    background: #edf3f9;
+}
+
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.no-results {
+    padding: 15px;
+    color: #777;
+    font-size: 14px;
+}
+
+/* Mapa */
+#map {
+    height: 650px;
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    z-index: 1;
+}
+
+/* Painel */
+.info-panel {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    height: fit-content;
+}
+
+.boletim-box {
+    background: #f0f9ff;
+    border-left: 4px solid #0284c7;
+    padding: 12px 14px;
+    border-radius: 6px;
+    margin-top: 6px;
+    line-height: 1.5;
+    font-size: 14px;
+    color: #0f172a;
+    font-weight: normal;
+}
+
+.info-panel h2 {
+    margin-top: 0;
+    color: #1e3a5f;
+    font-size: 20px;
+}
+
+.info-item {
+    padding: 12px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.info-label {
+    display: block;
+    color: #777;
+    font-size: 12px;
+    margin-bottom: 5px;
+}
+
+.info-value {
+    font-weight: bold;
+    color: #333;
+}
+
+.description {
+    color: #777;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Clima */
+.clima-grade {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
+    margin-top: 12px;
+}
+
+.clima-grade[hidden] {
+    display: none;
+}
+
+.clima-fonte {
+    display: block;
+    margin-top: 10px;
+    color: #999;
+    font-size: 11px;
+}
+
+/* Filtros facetados e operadores booleanos (Recuperação da Informação) */
+.filters-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+    align-items: center;
+}
+
+.filter-select,
+.filter-checkbox-label,
+.meta-button {
+    background: white;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 7px 11px;
+    font-size: 13px;
+    color: #1e3a5f;
+    cursor: pointer;
+}
+
+.filter-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+}
+
+.search-help {
+    font-size: 12px;
+    color: #555;
+    margin-top: 6px;
+}
+
+.search-help code {
+    background: #e2e8f0;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+.badge-tipo {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    margin-left: 8px;
+    background: #e2e8f0;
+    color: #334155;
+    font-weight: normal;
+}
+
+.badge-risco {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.meta-box {
+    margin-top: 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 12px;
+    color: #334155;
+    max-height: 260px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+}
+
+@media (max-width: 800px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+
+    #map {
+        height: 500px;
+    }
+}
