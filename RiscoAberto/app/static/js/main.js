@@ -1067,7 +1067,7 @@ searchInput.addEventListener("keydown", function(event) {
 
     else if (event.key === "Escape") {
 
-        suggestions.style.display = "none";
+        limparPesquisa();
 
     }
 
@@ -1092,7 +1092,7 @@ function atualizarSugestaoAtiva(botoes) {
 // 10. LIMPAR PESQUISA
 // ==========================================
 
-clearButton.addEventListener("click", function() {
+function limparPesquisa() {
 
     searchInput.value = "";
 
@@ -1154,7 +1154,32 @@ clearButton.addEventListener("click", function() {
     document.getElementById("bairro-backend-mensagem").textContent =
         "Selecione um bairro para consultar o backend.";
 
+}
+
+clearButton.addEventListener("click", function() {
+
+    limparPesquisa();
     searchInput.focus();
+
+});
+
+// Atalho global: tecla Esc limpa o bairro selecionado e volta a ver todos os bairros
+document.addEventListener("keydown", function(event) {
+
+    if (event.key === "Escape") {
+
+        if (
+            bairroSelecionado !== null ||
+            searchInput.value.trim() !== "" ||
+            ultimosResultados.length > 0 ||
+            camadaSelecionada.getLayers().length > 0
+        ) {
+            limparPesquisa();
+        } else if (suggestions.style.display === "block") {
+            suggestions.style.display = "none";
+        }
+
+    }
 
 });
 
