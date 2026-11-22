@@ -58,7 +58,7 @@ const camadaTodosBairros = L.geoJSON(null, {
 
 });
 
-// Camada independente para destacar o bairro pesquisado
+// Camada independente para destacar o bairro ou conjunto de bairros pesquisados
 const camadaSelecionada = L.geoJSON(null, {
 
     pane: "bairrosPane",
@@ -69,8 +69,18 @@ const camadaSelecionada = L.geoJSON(null, {
             color: "#045a8d",
             weight: 2.5,
             opacity: 1,
-            fillOpacity: 0.4
+            fillOpacity: 0.45
         };
+    },
+
+    onEachFeature: function(feature, layer) {
+        layer.bindTooltip(
+            feature.properties.ROTULO_CONTROLADO || feature.properties.NOME || "Bairro"
+        );
+
+        layer.on("click", function() {
+            selecionarBairro(feature);
+        });
     }
 
 });
@@ -139,10 +149,12 @@ const camadaInundacao = L.geoJSON(null, {
     }
 
 });
+
 let bairros = [];
 let bairroSelecionado = null;
 let indiceAtivo = -1;
 let requisicaoBairroId = 0;
+let ultimosResultados = [];
 
 // ==========================================
 // CAMADAS DE SOLUÇÕES BASEADAS NA NATUREZA (SBN)
@@ -348,6 +360,7 @@ fetch("/api/areas-inundacao/geojson")
 const searchInput = document.getElementById("search-bairro");
 const suggestions = document.getElementById("suggestions");
 const clearButton = document.getElementById("clear-search");
+const searchIcon = document.querySelector(".search-icon");
 
 
 // ==========================================
@@ -610,7 +623,7 @@ async function consultarClima(feature) {
 
 
 // ==========================================
-// 6. SELECIONAR UM BAIRRO
+// 6. SELECIONAR UM OU MÚLTIPLOS BAIRROS
 // ==========================================
 
 function selecionarBairro(feature) {
@@ -661,11 +674,79 @@ function selecionarBairro(feature) {
     consultarClima(feature);
 
     // Atualiza pesquisa
-    searchInput.value = feature.properties.NOME;
+    searchInput.value = feature.properties.ROTULO_CONTROLADO || feature.properties.NOME;
 
     // Fecha sugestões
     suggestions.style.display = "none";
 
+    clearButton.style.display = "block";
+
+}
+
+function destacarMultiplosBairros(lista, termoBusca) {
+
+    if (!lista || lista.length === 0) {
+        return;
+    }
+
+    if (lista.length === 1) {
+        selecionarBairro(lista[0]);
+        return;
+    }
+
+    bairroSelecionado = null;
+    camadaSelecionada.clearLayers();
+    camadaTodosBairros.clearLayers();
+
+    // Adiciona todos os bairros correspondentes na camada destacada
+    camadaSelecionada.addData({
+        type: "FeatureCollection",
+        features: lista
+    });
+
+    camadaSelecionada.addTo(map);
+
+    try {
+        const limites = camadaSelecionada.getBounds();
+        if (limites && limites.isValid()) {
+            map.fitBounds(limites, {
+                padding: [40, 40],
+                maxZoom: 15
+            });
+        }
+    } catch (e) {
+        console.warn("Erro ao ajustar limites do mapa:", e);
+    }
+
+    // Atualiza o painel com o resumo da busca
+    document.getElementById("bairro-nome").textContent =
+        `Busca: ${lista.length} unidades encontradas`;
+
+    const nomesFormatados = lista.slice(0, 6)
+        .map(f => f.properties.ROTULO_CONTROLADO || f.properties.NOME)
+        .join(", ");
+    const sufixoMais = lista.length > 6 ? ` e mais ${lista.length - 6}...` : "";
+
+    document.getElementById("bairro-descricao").textContent =
+        `Resultados da busca para "${termoBusca}". Mostrando todos os contornos correspondentes destacados no mapa. Clique em um bairro no mapa para ver o diagnóstico individual.`;
+
+    document.getElementById("bairro-backend-mensagem").textContent =
+        `Unidades territoriais localizadas: ${nomesFormatados}${sufixoMais}. Clique sobre qualquer um dos polígonos no mapa para gerar o boletim detalhado de riscos e clima.`;
+
+    limparClima(`Exibindo ${lista.length} bairros no mapa. Clique em um bairro específico para ver os dados climáticos.`);
+
+    [
+        "bairro-id",
+        "bairro-bac",
+        "bairro-codigo",
+        "bairro-area",
+        "bairro-perimetro",
+        "bairro-geometria"
+    ].forEach(id => {
+        document.getElementById(id).textContent = "-";
+    });
+
+    suggestions.style.display = "none";
     clearButton.style.display = "block";
 
 }
@@ -694,8 +775,17 @@ function mostrarSugestoes(lista) {
         return;
     }
 
-    // Limita a quantidade de sugestões visíveis
-    lista.slice(0, 12).forEach((feature) => {
+    // Cabeçalho informativo com contagem e dica de navegação
+    const cabecalho = document.createElement("div");
+    cabecalho.className = "suggestions-header";
+    cabecalho.innerHTML = `
+        <span><strong>${lista.length}</strong> encontrado(s)</span>
+        <span style="font-size:11px; color:#64748b; font-weight:normal;">Pressione [Enter] para ver todos no mapa</span>
+    `;
+    suggestions.appendChild(cabecalho);
+
+    // Limita a quantidade de sugestões visíveis na lista suspensa
+    lista.slice(0, 15).forEach((feature) => {
 
         const props = feature.properties;
         const botao = document.createElement("button");
@@ -740,42 +830,111 @@ const filterTipo = document.getElementById("filter-tipo");
 const filterRiscoInundacao = document.getElementById("filter-risco-inundacao");
 
 /**
- * Avalia uma expressão de busca com suporte aos operadores lógicos:
- *   - OR / OU (união de subexpressões)
- *   - AND / E (interseção de termos)
- *   - NOT / NAO / -termo (exclusão booleana)
+ * Parser de consultas booleanas que suporta:
+ *   - OR / OU: união de blocos de busca
+ *   - AND / E: interseção de termos dentro do bloco
+ *   - NOT / NAO / -termo: exclusão de termos indesejados
+ *   - Aspas: ex. "Santa Efigenia" para correspondência de expressão
+ *   - Parênteses: ignorados de forma graciosa sem quebrar a busca
+ *   - Tolerância a operadores pendentes enquanto o usuário digita
  */
-function avaliarConsultaBooleana(documentoNorm, consultaBruta) {
-    const consulta = normalizarTexto(consultaBruta);
-    if (!consulta) {
-        return true;
+function parseConsultaBooleana(consultaBruta) {
+    if (!consultaBruta || typeof consultaBruta !== "string") {
+        return null;
     }
 
-    // Divide por OR / OU
-    const blocosOr = consulta.split(/\s+(?:or|ou)\s+/);
+    let texto = normalizarTexto(consultaBruta);
+    if (!texto) {
+        return null;
+    }
 
-    return blocosOr.some(bloco => {
-        // Tokeniza respeitando NOT / NAO e prefixo '-'
-        const tokens = bloco.trim().split(/\s+/);
+    // Higieniza parênteses
+    texto = texto.replace(/[()]/g, " ");
+
+    // Divide a consulta pelos operadores de união OR / OU (com limites de palavra)
+    const blocosOrRaw = texto.split(/\b(?:or|ou)\b/i);
+    const blocosValidos = [];
+
+    for (let blocoRaw of blocosOrRaw) {
+        blocoRaw = blocoRaw.trim();
+        if (!blocoRaw) {
+            continue;
+        }
+
+        // Tokeniza respeitando aspas para expressões compostas
+        const tokens = [];
+        const regexTokens = /"([^"]+)"|(\S+)/g;
+        let match;
+        while ((match = regexTokens.exec(blocoRaw)) !== null) {
+            const token = (match[1] || match[2]).trim();
+            if (token) {
+                tokens.push(token);
+            }
+        }
+
         const obrigatorios = [];
         const excluidos = [];
 
         for (let i = 0; i < tokens.length; i++) {
             const t = tokens[i];
-            if (!t || t === "and" || t === "e") {
+
+            // Ignora conectivos de conjunção soltos
+            if (t === "and" || t === "e") {
                 continue;
             }
-            if ((t === "not" || t === "nao") && i + 1 < tokens.length) {
-                excluidos.push(tokens[++i]);
-            } else if (t.startsWith("-") && t.length > 1) {
-                excluidos.push(t.slice(1));
-            } else {
-                obrigatorios.push(t);
+
+            // Operadores de negação
+            if (t === "not" || t === "nao") {
+                if (i + 1 < tokens.length) {
+                    const prox = tokens[++i];
+                    if (
+                        prox &&
+                        prox !== "and" &&
+                        prox !== "e" &&
+                        prox !== "not" &&
+                        prox !== "nao"
+                    ) {
+                        excluidos.push(prox);
+                    }
+                }
+                // Se não há próximo termo (usuário ainda digitando), apenas ignora
+                continue;
             }
+
+            // Prefixo de exclusão '-' (ex.: -vila, -inundacao)
+            if (t.startsWith("-") && t.length > 1) {
+                excluidos.push(t.slice(1));
+                continue;
+            }
+
+            obrigatorios.push(t);
         }
 
-        const atendeObrigatorios = obrigatorios.every(termo => documentoNorm.includes(termo));
-        const atendeExcluidos = excluidos.every(termo => !documentoNorm.includes(termo));
+        // Considera o bloco válido se tiver ao menos uma restrição
+        if (obrigatorios.length > 0 || excluidos.length > 0) {
+            blocosValidos.push({ obrigatorios, excluidos });
+        }
+    }
+
+    return blocosValidos.length > 0 ? blocosValidos : null;
+}
+
+/**
+ * Avalia se o documento indexado do bairro satisfaz os blocos da consulta booleana.
+ */
+function avaliarDocumento(documentoNorm, blocos) {
+    if (!blocos || blocos.length === 0) {
+        return true;
+    }
+
+    // Regra do OR: se atender a qualquer bloco, retorna true
+    return blocos.some(bloco => {
+        const atendeObrigatorios = bloco.obrigatorios.every(termo =>
+            documentoNorm.includes(termo)
+        );
+        const atendeExcluidos = bloco.excluidos.every(termo =>
+            !documentoNorm.includes(termo)
+        );
 
         return atendeObrigatorios && atendeExcluidos;
     });
@@ -783,18 +942,21 @@ function avaliarConsultaBooleana(documentoNorm, consultaBruta) {
 
 function executarPesquisa() {
     const textoBruto = searchInput.value;
-    const texto = normalizarTexto(textoBruto);
     const tipoSelecionado = filterTipo.value;
     const apenasComRisco = filterRiscoInundacao.checked;
 
     clearButton.style.display = textoBruto ? "block" : "none";
 
-    if (texto.length === 0 && tipoSelecionado === "TODOS" && !apenasComRisco) {
+    const consultaVazia = !textoBruto || !textoBruto.trim();
+    if (consultaVazia && tipoSelecionado === "TODOS" && !apenasComRisco) {
         suggestions.style.display = "none";
+        ultimosResultados = [];
         return;
     }
 
-    const resultados = bairros.filter(feature => {
+    const blocos = parseConsultaBooleana(textoBruto);
+
+    ultimosResultados = bairros.filter(feature => {
         const props = feature.properties;
 
         // 1. Filtro Facetado por TIPO (Bairro, Vila, Conjunto)
@@ -807,20 +969,35 @@ function executarPesquisa() {
             return false;
         }
 
-        // 3. Documento indexado combinando Nome, Tipo, Rótulo Controlado e descritor de risco
+        // 3. Documento indexado com vocabulário controlado e descritores claros
+        const statusRisco = props.AREAS_INUNDACAO > 0
+            ? "inundacao risco alagamento"
+            : "livre seguro sem_inundacao";
+
         const docIndexado = normalizarTexto(
-            `${props.NOME || ""} ${props.TIPO || ""} ${props.ROTULO_CONTROLADO || ""} ${props.AREAS_INUNDACAO > 0 ? "inundacao risco" : "sem risco"}`
+            `${props.NOME || ""} ${props.TIPO || ""} ${props.ROTULO_CONTROLADO || ""} ${statusRisco}`
         );
 
-        return avaliarConsultaBooleana(docIndexado, textoBruto);
+        return avaliarDocumento(docIndexado, blocos);
     });
 
-    mostrarSugestoes(resultados);
+    mostrarSugestoes(ultimosResultados);
 }
 
 searchInput.addEventListener("input", executarPesquisa);
 filterTipo.addEventListener("change", executarPesquisa);
 filterRiscoInundacao.addEventListener("change", executarPesquisa);
+
+if (searchIcon) {
+    searchIcon.setAttribute("title", "Executar busca no mapa (Enter)");
+    searchIcon.addEventListener("click", () => {
+        if (ultimosResultados.length === 1) {
+            selecionarBairro(ultimosResultados[0]);
+        } else if (ultimosResultados.length > 1) {
+            destacarMultiplosBairros(ultimosResultados, searchInput.value);
+        }
+    });
+}
 
 // Botão de Metadados Dublin Core / ISO 19115 / e-ARQ
 const btnMetadados = document.getElementById("btn-metadados");
@@ -891,9 +1068,13 @@ searchInput.addEventListener("keydown", function(event) {
 
             botoes[indiceAtivo].click();
 
-        } else if (botoes.length === 1) {
+        } else if (ultimosResultados.length === 1) {
 
-            botoes[0].click();
+            selecionarBairro(ultimosResultados[0]);
+
+        } else if (ultimosResultados.length > 1) {
+
+            destacarMultiplosBairros(ultimosResultados, searchInput.value);
 
         }
 
@@ -934,12 +1115,13 @@ clearButton.addEventListener("click", function() {
 
     clearButton.style.display = "none";
 
-    // Remove o bairro selecionado
+    // Remove os bairros selecionados
     map.removeLayer(camadaSelecionada);
 
     camadaSelecionada.clearLayers();
 
     bairroSelecionado = null;
+    ultimosResultados = [];
 
     // Invalida requisições anteriores
     requisicaoBairroId++;
@@ -947,8 +1129,7 @@ clearButton.addEventListener("click", function() {
 
     limparClima("Selecione um bairro para ver o clima.");
 
-    // Se o toggle geral estiver ligado,
-    // restaura todos os bairros
+    // Se o toggle geral estiver ligado, restaura todos os bairros
     if (bairrosVisiveis()) {
 
         camadaTodosBairros.clearLayers();
